@@ -24,6 +24,7 @@ module Ai
       end
 
       optional(:balance).filled(:string)
+      required(:health_rating).filled(:integer)
       optional(:advice).filled(:string)
       optional(:confidence).filled(:float)
       optional(:assumptions).array(:string)
@@ -68,6 +69,13 @@ module Ai
       end
     end
 
+    # Validate health_rating range
+    rule(:health_rating) do
+      if value
+        key.failure("must be between 1 and 10") unless (1..10).include?(value)
+      end
+    end
+
     # Validate portion_size in foods
     rule(:foods) do
       if value.is_a?(Array)
@@ -83,12 +91,13 @@ module Ai
     end
 
     # Conditional validation based on status
-    rule(:status, :foods, :total, :confidence) do
+    rule(:status, :foods, :total, :confidence, :health_rating) do
       case values[:status]
       when "success"
         key(:foods).failure("must be present and non-empty for success status") unless values[:foods]&.any?
         key(:total).failure("must be present for success status") unless values[:total]
         key(:confidence).failure("must be present for success status") unless values[:confidence]
+        key(:health_rating).failure("must be present for success status") unless values[:health_rating]
       end
     end
 

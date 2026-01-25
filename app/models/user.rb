@@ -27,4 +27,17 @@ class User < ApplicationRecord
   def has_pending_context?
     pending_context.present?
   end
+
+  def first_time_user?
+    last_seen_at.nil?
+  end
+
+  def first_time_today?
+    return false if last_seen_at.nil?
+    last_seen_at.to_date < Date.today
+  end
+
+  def update_last_seen!
+    update!(last_seen_at: Time.current)
+  end
 end

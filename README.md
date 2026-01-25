@@ -1,4 +1,4 @@
-# 🍛 FoodBot - AI Nutrition Tracker
+# 🍛 KhanaAI - AI Nutrition Tracker
 
 A Ruby on Rails Telegram bot that analyzes food photos and estimates calories and macronutrients using OpenAI GPT-4o Vision. Optimized for **Nepali cuisine**.
 

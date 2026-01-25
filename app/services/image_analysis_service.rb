@@ -5,9 +5,10 @@ require "json"
 class ImageAnalysisService
   MAX_RETRIES = 2
 
-  def initialize(image_url, caption = nil)
+  def initialize(image_url, caption = nil, language = 'en')
     @image_url = image_url
     @caption = caption
+    @language = language
   end
 
   def call
@@ -32,9 +33,15 @@ class ImageAnalysisService
     client = OpenAI::Client.new(access_token: ENV["OPENAI_API_KEY"])
 
     caption_input = @caption ? "USER PROVIDED CAPTION: '#{@caption}'" : "NO CAPTION PROVIDED"
+    
+    target_language = @language == 'ne' ? "Nepali (Devanagari)" : "English"
+    language_instruction = @language == 'ne' ? "OUTPUT MUST BE IN NEPALI LANGUAGE (Devanagari script) for 'name', 'advice', and 'assumptions'. Keep keys in English." : ""
 
     system_prompt = <<~SYSTEM
       You are a food nutrition analysis AI used inside a Telegram bot.
+      
+      TARGET LANGUAGE: #{target_language}
+      #{language_instruction}
 
       Your job:
       - Analyze a food image and optional caption
@@ -54,11 +61,7 @@ class ImageAnalysisService
       5. Be conservative and realistic with portion sizes.
       6. Confidence must be a number between 0.0 and 1.0.
       7. Prefer South Asian / Nepali food interpretations when applicable.
-      8. Normalize local terms:
-         - bhat → rice
-         - dal bhat → dal bhat
-         - tarkari → vegetable curry
-         - achar → pickle
+      8. Normalize local terms if output is English (e.g. bhat -> rice). If Nepali, use natural Nepali terms (भात).
       9. If multiple foods are detected, list all of them.
       10. Do NOT guess micronutrients beyond protein, carbs, and fat.
 
@@ -72,8 +75,8 @@ class ImageAnalysisService
         "meal_type": "breakfast | lunch | dinner | snack | unknown",
         "foods": [
           {
-            "name": "<detected food name>",
-            "normalized_name": "<normalized food name>",
+            "name": "<detected food name in #{target_language}>",
+            "normalized_name": "<normalized food name in English>",
             "quantity": "<human readable quantity>",
             "portion_size": "small | medium | large | unknown",
             "calories": <integer>,
@@ -89,13 +92,20 @@ class ImageAnalysisService
           "fat_g": <number>
         },
         "balance": "balanced | carb-heavy | protein-low | fat-heavy",
-        "advice": "<one short helpful sentence>",
+        "health_rating": <integer between 1 and 10>,
+        "advice": "<one short helpful sentence in #{target_language}>",
         "confidence": <number>,
         "assumptions": [
-          "<assumption 1>",
-          "<assumption 2>"
+          "<assumption 1 in #{target_language}>",
+          "<assumption 2 in #{target_language}>"
         ]
       }
+
+      HEALTH RATING GUIDELINES:
+      - 1-3: Unhealthy (high sugar, deep fried, processed)
+      - 4-6: Average (moderate balance, some processed elements)
+      - 7-8: Healthy (good balance, whole foods)
+      - 9-10: Excellent (optimal nutrition, superfoods)
 
       BALANCE CLASSIFICATION:
       - balanced: Protein 20-35%, Carbs 45-65%, Fat 20-35%
@@ -189,6 +199,7 @@ class ImageAnalysisService
       )
 
       response_text = response.dig("choices", 0, "message", "content")
+      Rails.logger.info("[ImageAnalysis] Raw AI Response: #{response_text}")
       validation = Ai::FoodResponseValidator.call(response_text)
 
       if validation[:success]

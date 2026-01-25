@@ -23,6 +23,7 @@ module Ai
     end
 
     optional(:balance).filled(:string)
+    required(:health_rating).filled(:integer)
     optional(:advice).filled(:string)
     optional(:confidence).filled(:float)
     optional(:assumptions).array(:string)
