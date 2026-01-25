@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_01_25_131129) do
+ActiveRecord::Schema[8.1].define(version: 2026_01_25_140809) do
   create_table "food_catalogs", force: :cascade do |t|
     t.integer "calories_per_serving"
     t.float "carbs_g"
@@ -40,12 +40,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_25_131129) do
     t.datetime "created_at", null: false
     t.datetime "eaten_at"
     t.integer "estimated_calories"
+    t.integer "health_rating"
     t.text "image_url"
     t.string "input_type"
     t.string "meal_type"
     t.text "raw_input"
     t.datetime "updated_at", null: false
     t.integer "user_id", null: false
+    t.integer "user_rating"
     t.index ["eaten_at"], name: "index_meals_on_eaten_at"
     t.index ["user_id"], name: "index_meals_on_user_id"
   end
@@ -66,10 +68,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_25_131129) do
 
   create_table "users", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.integer "daily_calorie_goal", default: 2000
     t.string "first_name", null: false
     t.boolean "is_premium", default: false
     t.string "language", default: "en"
     t.string "last_name"
+    t.datetime "last_seen_at"
     t.text "pending_context"
     t.bigint "telegram_id", null: false
     t.string "timezone", default: "Asia/Kathmandu"

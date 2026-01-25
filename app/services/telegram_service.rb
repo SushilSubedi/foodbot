@@ -33,19 +33,53 @@ class TelegramService
     nil
   end
 
-  def send_message(chat_id:, text:)
-    response = Faraday.post("#{base_url}/sendMessage", {
+  def send_message(chat_id:, text:, reply_markup: nil)
+    payload = {
       chat_id: chat_id,
       text: text
-    }) do |req|
-      req.options.open_timeout = 5
-      req.options.timeout = 5
-    end
+    }
+    payload[:reply_markup] = reply_markup if reply_markup
 
-    unless response.success?
+    response = Faraday.post("#{base_url}/sendMessage", payload.to_json, 'Content-Type' => 'application/json')
+
+    if response.success?
+      JSON.parse(response.body)
+    else
       Rails.logger.error("Telegram sendMessage HTTP Error: #{response.status} - #{response.body}")
+      nil
     end
   rescue StandardError => e
     Rails.logger.error("Telegram sendMessage error: #{e.message}")
+    nil
+  end
+
+  def edit_message_text(chat_id:, message_id:, text:, reply_markup: nil)
+    payload = {
+      chat_id: chat_id,
+      message_id: message_id,
+      text: text
+    }
+    payload[:reply_markup] = reply_markup if reply_markup
+
+    response = Faraday.post("#{base_url}/editMessageText", payload.to_json, 'Content-Type' => 'application/json')
+
+    unless response.success?
+      Rails.logger.error("Telegram editMessageText HTTP Error: #{response.status} - #{response.body}")
+    end
+  rescue StandardError => e
+    Rails.logger.error("Telegram editMessageText error: #{e.message}")
+  end
+
+  def answer_callback_query(callback_query_id:, text: nil)
+    payload = { callback_query_id: callback_query_id }
+    payload[:text] = text if text
+
+    response = Faraday.post("#{base_url}/answerCallbackQuery", payload.to_json, 'Content-Type' => 'application/json')
+
+    unless response.success?
+      Rails.logger.error("Telegram answerCallbackQuery HTTP Error: #{response.status} - #{response.body}")
+    end
+  rescue StandardError => e
+    Rails.logger.error("Telegram answerCallbackQuery error: #{e.message}")
   end
 end
