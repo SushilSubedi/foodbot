@@ -161,6 +161,15 @@ class TelegramController < ApplicationController
     if is_first_time
       # Brand new user
       welcome_text = TranslationService.t('welcome_new', lang, name: name)
+      
+      # Add preferences tip for new users
+      prefs_tip = if lang == 'ne'
+        "\n\n🎯 सुझाव: /preferences प्रयोग गरेर आफ्नो खाने बानी सेट गर्नुहोस् (शाकाहारी, एलर्जी, आदि) सटीक अनुमानको लागि!"
+      else
+        "\n\n🎯 Tip: Set your dietary preferences with /preferences (vegetarian, allergies, etc.) for more accurate estimates!"
+      end
+      
+      welcome_text += prefs_tip
     elsif is_first_today
       # Returning user, first time today
       meals_yesterday = user.meals.where('DATE(eaten_at) = ?', Date.yesterday).count
