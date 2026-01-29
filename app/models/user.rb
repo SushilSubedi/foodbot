@@ -200,12 +200,10 @@ class User < ApplicationRecord
     dietary_parts = []
     dietary_parts << "Vegetarian" if is_vegetarian?
     dietary_parts << "Vegan" if is_vegan?
-
     allergies = dietary_preferences&.dig("allergies") || []
     if allergies.any?
       dietary_parts << "Allergic to: #{allergies.join(', ')}"
     end
-
     dislikes = dietary_preferences&.dig("dislikes") || []
     if dislikes.any?
       dietary_parts << "Dislikes: #{dislikes.join(', ')}"
