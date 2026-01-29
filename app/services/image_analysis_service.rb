@@ -5,10 +5,11 @@ require "json"
 class ImageAnalysisService
   MAX_RETRIES = 2
 
-  def initialize(image_url, caption = nil, language = 'en')
+  def initialize(image_url, caption = nil, language = 'en', user = nil)
     @image_url = image_url
     @caption = caption
     @language = language
+    @user = user
   end
 
   def call
@@ -43,6 +44,8 @@ class ImageAnalysisService
       TARGET LANGUAGE: #{target_language}
       #{language_instruction}
 
+      #{build_user_context}
+
       Your job:
       - Analyze a food image and optional caption
       - Estimate calories and basic nutrition
@@ -58,12 +61,94 @@ class ImageAnalysisService
       3. If the image is unclear or food is ambiguous, return status = "uncertain".
       4. If the image cannot be analyzed at all, return status = "failed".
       5. Use ESTIMATED values, not exact values.
-      5. Be conservative and realistic with portion sizes.
-      6. Confidence must be a number between 0.0 and 1.0.
-      7. Prefer South Asian / Nepali food interpretations when applicable.
-      8. Normalize local terms if output is English (e.g. bhat -> rice). If Nepali, use natural Nepali terms (भात).
-      9. If multiple foods are detected, list all of them.
-      10. Do NOT guess micronutrients beyond protein, carbs, and fat.
+      6. Be conservative and realistic with portion sizes.
+      7. Confidence must be a number between 0.0 and 1.0.
+      8. Prefer South Asian / Nepali food interpretations when applicable.
+      9. Normalize local terms if output is English (e.g. bhat -> rice). If Nepali, use natural Nepali terms (भात).
+      10. If multiple foods are detected, list all of them.
+      11. Do NOT guess micronutrients beyond protein, carbs, and fat.
+
+      -----------------------------------
+      NEPALI FOOD & CULTURAL CONTEXT
+      -----------------------------------
+      MAIN DISHES:
+      - Dal Bhat: Rice (bhat) + lentil soup (dal) + vegetable curry (tarkari) + leafy greens (saag) + pickle (achar). The staple meal eaten twice daily. ~600-900 kcal depending on rice portion
+      - Dhido: Traditional millet/buckwheat porridge, eaten with gundruk soup or meat curry. ~300-400 kcal per serving
+      - Thukpa: Tibetan-style noodle soup with vegetables/meat. ~350-450 kcal
+      - Chowmein: Stir-fried noodles with vegetables, popular street food. ~400-500 kcal
+      - Khichdi: Rice and lentil comfort food, easy to digest. ~300-350 kcal
+
+      DUMPLINGS & SNACKS:
+      - Momo: Steamed (~250-350 kcal/10 pcs) or fried (~400-500 kcal/10 pcs) dumplings with buff/chicken/veg filling. Served with tomato achar
+      - Sekuwa: Grilled/skewered meat (buff/chicken/pork), popular street food. ~200-300 kcal per serving
+      - Choila: Spiced grilled buffalo meat, Newari specialty. ~250-300 kcal
+      - Samosa: Fried pastry with potato/meat filling. ~150-200 kcal each
+      - Pakoda/Bada: Deep-fried fritters (vegetable/lentil). ~100-150 kcal each
+      - Chatamari: Newari rice crepe with toppings (egg/meat/veg). ~300-400 kcal
+      - Bara: Lentil patty, fried. ~150-200 kcal each
+      - Aloo Chop: Fried potato patty. ~150 kcal each
+      - Panipuri/Golgappa: Hollow crispy puri with spiced water. ~200 kcal per plate
+
+      BREAKFAST & LIGHT MEALS:
+      - Chiura (beaten rice): Often with yogurt, vegetables, or meat. ~200-300 kcal per cup
+      - Sel Roti: Ring-shaped rice bread, sweet, fried. ~150-200 kcal each
+      - Roti/Chapati: Wheat flatbread. ~100-120 kcal each
+      - Paratha: Layered flatbread with ghee. ~200-250 kcal each
+      - Puri: Deep-fried bread. ~150 kcal each
+      - Aloo Paratha: Stuffed potato paratha. ~250-300 kcal each
+
+      NEWARI CUISINE:
+      - Newari Khaja Set: Chiura, choila, bara, achar, egg, beans. ~600-800 kcal
+      - Yomari: Sweet rice dumpling with chaku/khuwa filling. ~150-200 kcal each
+      - Wo: Lentil patty with egg. ~200 kcal
+      - Samay Baji: Traditional feast platter. ~700-900 kcal
+      - Kwati: Mixed bean soup, nutritious. ~200-250 kcal per bowl
+
+      MEAT DISHES:
+      - Buff (buffalo) Curry: ~300-400 kcal per serving
+      - Chicken Curry: ~250-350 kcal per serving
+      - Mutton Curry: ~350-450 kcal per serving
+      - Pork Curry: ~300-400 kcal per serving
+      - Fish Curry (machha): ~200-300 kcal per serving
+
+      VEGETABLES & SIDES:
+      - Tarkari: Mixed vegetable curry. ~100-150 kcal
+      - Saag: Leafy greens (spinach/mustard). ~50-100 kcal
+      - Gundruk: Fermented leafy greens. ~30-50 kcal
+      - Achar: Pickle (tomato, radish, etc.). ~30-50 kcal
+      - Raita: Yogurt with cucumber. ~50-80 kcal
+      - Papad: Crispy lentil wafer. ~50 kcal each
+
+      DRINKS & DESSERTS:
+      - Chiya: Nepali milk tea. ~80-120 kcal with sugar
+      - Lassi: Yogurt drink (sweet/salty). ~150-200 kcal
+      - Juju Dhau: Sweetened yogurt from Bhaktapur. ~200-250 kcal
+      - Kheer: Rice pudding. ~200-250 kcal
+      - Rasbari/Gulab Jamun: Syrup-soaked sweets. ~150-200 kcal each
+      - Lakhamari: Hard sweet bread. ~150-200 kcal each
+
+      REGIONAL VARIATIONS:
+      - Thakali Khana: Complete meal set from Mustang region
+      - Sherpa Stew: High-altitude hearty stew
+      - Terai cuisine: More use of fish, mustard oil
+
+      MEAL PATTERNS:
+      - Breakfast (bihana ko khana): Chiura, roti, paratha, chiya
+      - Lunch/Dinner (khana): Dal bhat with sides
+      - Snacks (khaja): Momo, chowmein, samosa, tea-time items
+      - Festival foods: Sel roti, yomari, bara, puri (calorie-dense)
+      
+      -----------------------------------
+      ADVICE GUIDELINES
+      -----------------------------------
+      Provide practical, culturally-relevant advice in 1-2 short sentences:
+      - Suggest healthier alternatives from Nepali cuisine (steamed momo vs fried, more saag/tarkari, smaller rice portion, less ghee/oil)
+      - For carb-heavy meals: suggest adding more dal, saag, or protein
+      - For fried foods: suggest grilled/steamed alternatives or reduce frequency
+      - For sugary drinks/tea: suggest reducing sugar
+      - Consider the user's location/region if provided for context
+      - Keep advice actionable and realistic
+      - Avoid medical claims
 
       -----------------------------------
       SUCCESS RESPONSE FORMAT
@@ -92,7 +177,7 @@ class ImageAnalysisService
           "fat_g": <number>
         },
         "balance": "balanced | carb-heavy | protein-low | fat-heavy",
-        "health_rating": <integer between 1 and 10>,
+        "health_rating": <number between 1.0 and 10.0>,
         "advice": "<one short helpful sentence in #{target_language}>",
         "confidence": <number>,
         "assumptions": [
@@ -114,10 +199,10 @@ class ImageAnalysisService
       - fat-heavy: Fat > 35%
 
       MEAL TYPE DETERMINATION:
-      - breakfast: Morning foods like eggs, bread, cereal, chiura
-      - lunch: Midday meals like dal bhat, rice dishes
-      - dinner: Evening meals, similar to lunch
-      - snack: Light foods like momo, samosa, fruits
+      - breakfast: Morning foods like eggs, bread, cereal, chiura, roti, paratha, chiya with snacks
+      - lunch: Midday meals like dal bhat, rice dishes, khana
+      - dinner: Evening meals like dal bhat, khana, roti-based meals
+      - snack: Light foods like momo, samosa, chowmein, thukpa, sel roti, tea-time items, fruits, pakoda
       - unknown: Cannot determine
 
       -----------------------------------
@@ -266,6 +351,28 @@ class ImageAnalysisService
     )
 
     response.dig("choices", 0, "message", "content")
+  end
+
+  def build_user_context
+    return "" unless @user && @user.has_preferences?
+
+    context = @user.ai_context_summary
+    return "" unless context.present?
+
+    <<~CONTEXT
+
+      -----------------------------------
+      USER PREFERENCES & CONTEXT
+      -----------------------------------
+      #{context}
+      
+      IMPORTANT: Consider these user preferences when:
+      - Identifying food items (respect dietary restrictions)
+      - Estimating portion sizes (apply portion modifier)
+      - Calculating calories and macros (adjust for preferences)
+      - Providing dietary advice (align with user's goals)
+      
+    CONTEXT
   end
 
   def fallback_uncertain_response

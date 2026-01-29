@@ -1,9 +1,10 @@
 class TextClarificationService
-  def initialize(text:, image_url:, possible_foods:, calorie_range:)
+  def initialize(text:, image_url:, possible_foods:, calorie_range:, user: nil)
     @text = text
     @image_url = image_url
     @possible_foods = possible_foods
     @calorie_range = calorie_range
+    @user = user
   end
 
   def call
@@ -15,6 +16,8 @@ class TextClarificationService
       Estimated calorie range: #{@calorie_range['min']}-#{@calorie_range['max']} kcal
 
       The user has now clarified with: "#{@text}"
+
+      #{build_user_context}
 
       Based on this clarification, provide a complete nutrition analysis.
       Return STRICT JSON only, no markdown or extra text.
@@ -74,5 +77,23 @@ class TextClarificationService
       Rails.logger.error("TextClarificationService failed: #{e.message}")
       nil
     end
+  end
+
+  private
+
+  def build_user_context
+    return "" unless @user && @user.has_preferences?
+
+    context = @user.ai_context_summary
+    return "" unless context.present?
+
+    <<~CONTEXT
+
+      USER PREFERENCES:
+      #{context}
+      
+      Consider these preferences in your analysis.
+      
+    CONTEXT
   end
 end

@@ -24,7 +24,7 @@ module Ai
       end
 
       optional(:balance).filled(:string)
-      required(:health_rating).filled(:integer)
+      optional(:health_rating).filled(:float)
       optional(:advice).filled(:string)
       optional(:confidence).filled(:float)
       optional(:assumptions).array(:string)
@@ -72,7 +72,7 @@ module Ai
     # Validate health_rating range
     rule(:health_rating) do
       if value
-        key.failure("must be between 1 and 10") unless (1..10).include?(value)
+        key.failure("must be between 1.0 and 10.0") unless value >= 1.0 && value <= 10.0
       end
     end
 

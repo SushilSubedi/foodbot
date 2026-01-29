@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_01_25_140809) do
+ActiveRecord::Schema[8.1].define(version: 2026_01_29_044401) do
   create_table "food_catalogs", force: :cascade do |t|
     t.integer "calories_per_serving"
     t.float "carbs_g"
@@ -40,7 +40,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_25_140809) do
     t.datetime "created_at", null: false
     t.datetime "eaten_at"
     t.integer "estimated_calories"
-    t.integer "health_rating"
+    t.float "health_rating"
     t.text "image_url"
     t.string "input_type"
     t.string "meal_type"
@@ -50,6 +50,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_25_140809) do
     t.integer "user_rating"
     t.index ["eaten_at"], name: "index_meals_on_eaten_at"
     t.index ["user_id"], name: "index_meals_on_user_id"
+  end
+
+  create_table "promo_code_redemptions", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "promo_code_id", null: false
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.index ["promo_code_id"], name: "index_promo_code_redemptions_on_promo_code_id"
+    t.index ["user_id"], name: "index_promo_code_redemptions_on_user_id"
+  end
+
+  create_table "promo_codes", force: :cascade do |t|
+    t.boolean "active"
+    t.string "code"
+    t.datetime "created_at", null: false
+    t.datetime "expires_at"
+    t.integer "limit_increase"
+    t.integer "max_uses"
+    t.datetime "updated_at", null: false
+    t.integer "uses_count"
   end
 
   create_table "user_daily_stats", force: :cascade do |t|
@@ -67,14 +87,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_25_140809) do
   end
 
   create_table "users", force: :cascade do |t|
+    t.text "ai_context"
+    t.string "area"
+    t.string "city"
     t.datetime "created_at", null: false
     t.integer "daily_calorie_goal", default: 2000
+    t.integer "daily_limit"
+    t.json "dietary_preferences", default: {}
     t.string "first_name", null: false
+    t.integer "images_processed_count"
     t.boolean "is_premium", default: false
     t.string "language", default: "en"
     t.string "last_name"
+    t.date "last_process_date"
     t.datetime "last_seen_at"
     t.text "pending_context"
+    t.decimal "portion_modifier", precision: 3, scale: 2, default: "1.0"
     t.bigint "telegram_id", null: false
     t.string "timezone", default: "Asia/Kathmandu"
     t.datetime "updated_at", null: false
@@ -84,5 +112,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_25_140809) do
 
   add_foreign_key "food_items", "meals"
   add_foreign_key "meals", "users"
+  add_foreign_key "promo_code_redemptions", "promo_codes"
+  add_foreign_key "promo_code_redemptions", "users"
   add_foreign_key "user_daily_stats", "users"
 end
