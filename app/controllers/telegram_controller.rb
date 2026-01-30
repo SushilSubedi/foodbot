@@ -51,10 +51,6 @@ class TelegramController < ApplicationController
         handle_last_command(message)
       when "/undo"
         handle_undo_command(message)
-      when /^\/setlocation\s+(.+)/
-        handle_setlocation_command(message, $1)
-      when "/location"
-        handle_location_command(message)
       else
         if message[:photo].present?
           handle_photo_message(message)
@@ -87,15 +83,6 @@ class TelegramController < ApplicationController
     if is_first_time
       # Brand new user
       welcome_text = TranslationService.t('welcome_new', lang, name: name)
-      
-      # Add preferences tip for new users
-      prefs_tip = if lang == 'ne'
-        "\n\n🎯 सुझाव: /preferences प्रयोग गरेर आफ्नो खाने बानी सेट गर्नुहोस् (शाकाहारी, एलर्जी, आदि) सटीक अनुमानको लागि!"
-      else
-        "\n\n🎯 Tip: Set your dietary preferences with /preferences (vegetarian, allergies, etc.) for more accurate estimates!"
-      end
-      
-      welcome_text += prefs_tip
     elsif is_first_today
       # Returning user, first time today
       meals_yesterday = user.meals.where('DATE(eaten_at) = ?', Date.yesterday).count
@@ -119,6 +106,9 @@ class TelegramController < ApplicationController
       # Already seen today
       welcome_text = TranslationService.t('quick_menu', lang, name: name)
     end
+    
+    # Append help tip to all start messages
+    welcome_text += TranslationService.t('help_tip', lang)
     
     send_message(message.dig(:chat, :id), welcome_text)
   end
@@ -149,7 +139,6 @@ class TelegramController < ApplicationController
         /vegan - भेगन मोड
         /allergic <खाना> - एलर्जी
         /portions larger/smaller - भाग आकार
-        /setlocation <शहर>, <क्षेत्र> - स्थान
 
         ⚙️ सेटिङ:
         /language - भाषा परिवर्तन
@@ -180,7 +169,6 @@ class TelegramController < ApplicationController
         /allergic <food> - Add allergy
         /dislike <food> - Add dislike
         /portions larger/smaller/normal
-        /setlocation <city>, <area>
 
         ⚙️ Settings:
         /language - Toggle En/Ne
@@ -265,8 +253,6 @@ class TelegramController < ApplicationController
       date -= 1.day
     end
     
-    location_line = user.has_location? ? "\n  📍 Location: #{user.location_summary}" : ""
-    
     stats_text = if lang == 'ne'
       <<~TEXT
         👤 तपाईंको प्रोफाइल
@@ -277,7 +263,7 @@ class TelegramController < ApplicationController
         📸 आज बाँकी: #{remaining}/#{limit}
 
         🔧 सेटिङ:
-          भाषा: नेपाली#{location_line}
+          भाषा: नेपाली
 
         💡 /preferences · /help
       TEXT
@@ -291,7 +277,7 @@ class TelegramController < ApplicationController
         📸 Today remaining: #{remaining}/#{limit}
 
         🔧 Settings:
-          Language: English#{location_line}
+          Language: English
 
         💡 /preferences · /help
       TEXT
@@ -682,9 +668,9 @@ class TelegramController < ApplicationController
         ✅ #{food['name']}
 
         🔥 #{food['calories']} kcal
-        📊 प्रो: #{food['protein_g'].round(1)}g · कार्ब: #{food['carbs_g'].round(1)}g · फ्याट: #{food['fat_g'].round(1)}g
+        🍗 प्रोटिन: #{food['protein_g'].round(1)}g · 🍚 कार्ब: #{food['carbs_g'].round(1)}g · 🧈 फ्याट: #{food['fat_g'].round(1)}g
 
-        #{health_rating ? "💚 #{format_health_rating(health_rating)}/10 · " : ""}#{balance_text}
+        #{health_rating ? "💚 स्वास्थ्य: #{format_health_rating(health_rating)}/10 · " : ""}#{balance_text}
 
         💡 #{analysis['advice']}
       TEXT
@@ -693,9 +679,9 @@ class TelegramController < ApplicationController
         ✅ #{food['name'].capitalize}
 
         🔥 #{food['calories']} kcal
-        📊 P: #{food['protein_g'].round(1)}g · C: #{food['carbs_g'].round(1)}g · F: #{food['fat_g'].round(1)}g
+        🍗 Protein: #{food['protein_g'].round(1)}g · 🍚 Carbs: #{food['carbs_g'].round(1)}g · 🧈 Fat: #{food['fat_g'].round(1)}g
 
-        #{health_rating ? "💚 #{format_health_rating(health_rating)}/10 · " : ""}#{balance_text}
+        #{health_rating ? "💚 Health: #{format_health_rating(health_rating)}/10 · " : ""}#{balance_text}
 
         💡 #{analysis['advice']}
       TEXT
@@ -719,9 +705,9 @@ class TelegramController < ApplicationController
         #{foods_text}
 
         🔥 जम्मा: #{total['calories']} kcal
-        📊 प्रो: #{total['protein_g'].round(1)}g · कार्ब: #{total['carbs_g'].round(1)}g · फ्याट: #{total['fat_g'].round(1)}g
+        🍗 प्रोटिन: #{total['protein_g'].round(1)}g · 🍚 कार्ब: #{total['carbs_g'].round(1)}g · 🧈 फ्याट: #{total['fat_g'].round(1)}g
 
-        #{health_rating ? "💚 #{format_health_rating(health_rating)}/10 · " : ""}#{balance_text}
+        #{health_rating ? "💚 स्वास्थ्य: #{format_health_rating(health_rating)}/10 · " : ""}#{balance_text}
 
         💡 #{analysis['advice']}
       TEXT
@@ -732,9 +718,9 @@ class TelegramController < ApplicationController
         #{foods_text}
 
         🔥 Total: #{total['calories']} kcal
-        📊 P: #{total['protein_g'].round(1)}g · C: #{total['carbs_g'].round(1)}g · F: #{total['fat_g'].round(1)}g
+        🍗 Protein: #{total['protein_g'].round(1)}g · 🍚 Carbs: #{total['carbs_g'].round(1)}g · 🧈 Fat: #{total['fat_g'].round(1)}g
 
-        #{health_rating ? "💚 #{format_health_rating(health_rating)}/10 · " : ""}#{balance_text}
+        #{health_rating ? "💚 Health: #{format_health_rating(health_rating)}/10 · " : ""}#{balance_text}
 
         💡 #{analysis['advice']}
       TEXT
@@ -1014,10 +1000,6 @@ class TelegramController < ApplicationController
       prefs << (lang == 'ne' ? "📝 नोट: #{user.ai_context}" : "📝 Note: #{user.ai_context}")
     end
     
-    if user.has_location?
-      prefs << (lang == 'ne' ? "📍 स्थान: #{user.location_summary}" : "📍 Location: #{user.location_summary}")
-    end
-    
     header = lang == 'ne' ? "तपाईंका प्राथमिकताहरू:" : "Your preferences:"
     text = "#{header}\n\n#{prefs.join("\n")}"
     
@@ -1105,53 +1087,6 @@ class TelegramController < ApplicationController
       "✅ हटाइयो: #{foods} (#{calories} kcal)"
     else
       "✅ Removed: #{foods} (#{calories} kcal)"
-    end
-
-    send_message(chat_id, text)
-  end
-
-  def handle_setlocation_command(message, location)
-    user = User.find_by(telegram_id: message.dig(:from, :id))
-    chat_id = message.dig(:chat, :id)
-    return unless user
-
-    lang = user.language || 'en'
-    
-    parts = location.split(",").map(&:strip)
-    city = parts[0]
-    area = parts[1]
-
-    user.update!(city: city, area: area)
-
-    location_display = [city, area].compact.join(", ")
-    text = if lang == 'ne'
-      "📍 स्थान सेट गरियो: #{location_display}\n\n💡 म अब तपाईंको क्षेत्रको खानाको लागि सुझाव दिनेछु!"
-    else
-      "📍 Location set: #{location_display}\n\n💡 I'll now give tips relevant to your area!"
-    end
-
-    send_message(chat_id, text)
-  end
-
-  def handle_location_command(message)
-    user = User.find_by(telegram_id: message.dig(:from, :id))
-    chat_id = message.dig(:chat, :id)
-    return unless user
-
-    lang = user.language || 'en'
-
-    if user.has_location?
-      text = if lang == 'ne'
-        "📍 तपाईंको स्थान: #{user.location_summary}\n\n🔄 परिवर्तन गर्न: /setlocation <शहर>, <क्षेत्र>"
-      else
-        "📍 Your location: #{user.location_summary}\n\n🔄 Change: /setlocation <city>, <area>"
-      end
-    else
-      text = if lang == 'ne'
-        "📍 स्थान सेट गरिएको छैन।\n\n➡️ सेट गर्न: /setlocation काठमाडौं, बानेश्वर"
-      else
-        "📍 No location set.\n\n➡️ Set: /setlocation Kathmandu, Baneshwor"
-      end
     end
 
     send_message(chat_id, text)

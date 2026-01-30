@@ -1,3 +1,8 @@
+# NOTE: This file appears to be unused. The active contract is in:
+# app/services/ai/food_analysis_contract.rb
+#
+# Keeping this file for reference only.
+
 module Ai
   class FoodAnalysisContract < Dry::Validation::Contract
     params do

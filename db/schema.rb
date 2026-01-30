@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_01_29_044401) do
+ActiveRecord::Schema[8.1].define(version: 2026_01_29_105915) do
   create_table "food_catalogs", force: :cascade do |t|
     t.integer "calories_per_serving"
     t.float "carbs_g"
@@ -88,8 +88,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_01_29_044401) do
 
   create_table "users", force: :cascade do |t|
     t.text "ai_context"
-    t.string "area"
-    t.string "city"
     t.datetime "created_at", null: false
     t.integer "daily_calorie_goal", default: 2000
     t.integer "daily_limit"

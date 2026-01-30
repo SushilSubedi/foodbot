@@ -125,24 +125,10 @@ class User < ApplicationRecord
     portion_modifier != 1.0 || ai_context.present?
   end
 
-  def has_location?
-    city.present? || area.present?
-  end
-
-  def location_summary
-    return nil unless has_location?
-    [city, area].compact.join(", ")
-  end
-
   def ai_context_summary
-    return nil unless has_preferences? || has_location?
+    return nil unless has_preferences?
 
     context_parts = []
-    
-    # Location context
-    if has_location?
-      context_parts << "Location: #{location_summary}"
-    end
     
     # Dietary restrictions
     dietary_parts = []
