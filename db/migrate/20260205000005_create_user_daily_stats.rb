@@ -7,7 +7,6 @@ class CreateUserDailyStats < ActiveRecord::Migration[8.1]
       t.float :total_protein_g
       t.float :total_carbs_g
       t.float :total_fat_g
-
       t.timestamps
     end
 

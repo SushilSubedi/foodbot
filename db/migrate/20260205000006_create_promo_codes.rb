@@ -5,9 +5,8 @@ class CreatePromoCodes < ActiveRecord::Migration[8.1]
       t.integer :limit_increase
       t.integer :max_uses
       t.integer :uses_count
-      t.datetime :expires_at
       t.boolean :active
-
+      t.datetime :expires_at
       t.timestamps
     end
   end

@@ -1,61 +1,73 @@
 class TelegramController < ApplicationController
+  # New personalization commands
+  NEW_COMMANDS = %w[/setgoal /setactivity /setbio /setfasting /trends /suggest /profile /reminders].freeze
+
   def webhook
     update = params
     message = update[:message]
-    
-    if message
+    callback_query = update[:callback_query]
+
+    if callback_query
+      handle_callback_query(callback_query)
+    elsif message
       chat_id = message.dig(:chat, :id)
-      
-      case message[:text]
-      when "/start"
-        handle_start_command(message)
-      when "/help"
-        handle_help_command(message)
-      when "/about"
-        handle_about_command(message)
-      when "/today"
-        handle_today_command(message)
-      when "/week"
-        handle_week_command(message)
-      when "/stats"
-        handle_stats_command(message)
-      when "/setgoals"
-        handle_setgoals_command(message)
-      when /^\/setgoals\s+(\d+)/
-        handle_setgoals_value_command(message, $1.to_i)
-      when "/redeem"
-        handle_redeem_command(message)
-      when "/language"
-        handle_language_command(message)
-      when "/vegetarian"
-        handle_vegetarian_command(message)
-      when "/vegan"
-        handle_vegan_command(message)
-      when "/preferences"
-        handle_preferences_command(message)
-      when /^\/allergic\s+(.+)/
-        handle_allergic_command(message, $1)
-      when /^\/removeallergy\s+(.+)/
-        handle_removeallergy_command(message, $1)
-      when /^\/dislike\s+(.+)/
-        handle_dislike_command(message, $1)
-      when /^\/portions\s+(larger|smaller|normal)/
-        handle_portions_command(message, $1)
-      when /^\/setnote\s+(.+)/
-        handle_setnote_command(message, $1)
-      when "/clearnote"
-        handle_clearnote_command(message)
-      when "/history"
-        handle_history_command(message)
-      when "/last"
-        handle_last_command(message)
-      when "/undo"
-        handle_undo_command(message)
+      text = message[:text].to_s
+
+      # Check for new personalization commands first
+      if NEW_COMMANDS.any? { |cmd| text.downcase.start_with?(cmd) }
+        handle_new_command(message)
       else
-        if message[:photo].present?
-          handle_photo_message(message)
+        case text
+        when "/start"
+          handle_start_command(message)
+        when "/help"
+          handle_help_command(message)
+        when "/about"
+          handle_about_command(message)
+        when "/today"
+          handle_today_command(message)
+        when "/week"
+          handle_week_command(message)
+        when "/stats"
+          handle_stats_command(message)
+        when "/setgoals"
+          handle_setgoals_command(message)
+        when /^\/setgoals\s+(\d+)/
+          handle_setgoals_value_command(message, $1.to_i)
+        when "/redeem"
+          handle_redeem_command(message)
+        when "/language"
+          handle_language_command(message)
+        when "/vegetarian"
+          handle_vegetarian_command(message)
+        when "/vegan"
+          handle_vegan_command(message)
+        when "/preferences"
+          handle_preferences_command(message)
+        when /^\/allergic\s+(.+)/
+          handle_allergic_command(message, $1)
+        when /^\/removeallergy\s+(.+)/
+          handle_removeallergy_command(message, $1)
+        when /^\/dislike\s+(.+)/
+          handle_dislike_command(message, $1)
+        when /^\/portions\s+(larger|smaller|normal)/
+          handle_portions_command(message, $1)
+        when /^\/setnote\s+(.+)/
+          handle_setnote_command(message, $1)
+        when "/clearnote"
+          handle_clearnote_command(message)
+        when "/history"
+          handle_history_command(message)
+        when "/last"
+          handle_last_command(message)
+        when "/undo"
+          handle_undo_command(message)
         else
-          handle_text_message(message)
+          if message[:photo].present?
+            handle_photo_message(message)
+          else
+            handle_text_message(message)
+          end
         end
       end
     end
@@ -67,6 +79,72 @@ class TelegramController < ApplicationController
   end
 
   private
+
+  def t(key, lang, params = {})
+    TranslationService.t(key, lang, params)
+  end
+
+  def handle_new_command(message)
+    user = find_or_create_user(message[:from])
+    chat_id = message.dig(:chat, :id)
+    router = Telegram::CommandRouter.new(user)
+
+    response = router.route_command(message[:text])
+    send_response(chat_id, response) if response
+  end
+
+  def handle_callback_query(callback_query)
+    user = find_or_create_user(callback_query[:from])
+    chat_id = callback_query.dig(:message, :chat, :id)
+    message_id = callback_query.dig(:message, :message_id)
+    callback_data = callback_query[:data]
+
+    router = Telegram::CommandRouter.new(user)
+    response = router.route_callback(callback_data)
+
+    if response
+      # Answer callback to remove loading state
+      answer_callback(callback_query[:id])
+
+      # Send or edit message based on response
+      if response[:edit_message]
+        edit_message(chat_id, message_id, response)
+      else
+        send_response(chat_id, response)
+      end
+    end
+  end
+
+  def send_response(chat_id, response)
+    return unless response.is_a?(Hash)
+
+    telegram_service.send_message(
+      chat_id: chat_id,
+      text: response[:text],
+      parse_mode: response[:parse_mode] || "Markdown",
+      reply_markup: response[:reply_markup]
+    )
+  end
+
+  def edit_message(chat_id, message_id, response)
+    telegram_service.edit_message(
+      chat_id: chat_id,
+      message_id: message_id,
+      text: response[:text],
+      parse_mode: response[:parse_mode] || "Markdown",
+      reply_markup: response[:reply_markup]
+    )
+  end
+
+  def answer_callback(callback_query_id)
+    telegram_service.answer_callback_query(callback_query_id: callback_query_id)
+  rescue StandardError => e
+    Rails.logger.warn("Failed to answer callback: #{e.message}")
+  end
+
+  def telegram_service
+    @telegram_service ||= TelegramService.new
+  end
 
   def handle_start_command(message)
     user = find_or_create_user(message[:from])
@@ -116,88 +194,68 @@ class TelegramController < ApplicationController
   def handle_help_command(message)
     user = User.find_by(telegram_id: message.dig(:from, :id))
     lang = user&.language || 'en'
-    
-    help_text = if lang == 'ne'
-      <<~TEXT
-        🍛 KhanaAI - AI पोषण ट्र्याकर
 
-        📸 कसरी प्रयोग गर्ने:
-        1. खानाको फोटो पठाउनुहोस्
-        2. म क्यालोरी र पोषण अनुमान गर्छु
-        3. दैनिक तथ्याङ्क अपडेट हुन्छ
+    help_text = <<~TEXT
+      #{t('help_title', lang)}
 
-        📊 मुख्य आदेशहरू:
-        /today - आजको खाना
-        /week - साप्ताहिक सारांश
-        /history - पछिल्लो १० खाना
-        /last - अन्तिम खाना
-        /undo - अन्तिम खाना हटाउनुहोस्
+      #{t('help_track_title', lang)}
+      #{t('help_track_desc', lang)}
 
-        🎯 प्राथमिकताहरू:
-        /preferences - हेर्नुहोस्
-        /vegetarian - शाकाहारी मोड
-        /vegan - भेगन मोड
-        /allergic <खाना> - एलर्जी
-        /portions larger/smaller - भाग आकार
+      #{t('help_view_title', lang)}
+      #{t('help_cmd_today', lang)}
+      #{t('help_cmd_week', lang)}
+      #{t('help_cmd_trends', lang)}
+      #{t('help_cmd_history', lang)}
+      #{t('help_cmd_last', lang)}
+      #{t('help_cmd_undo', lang)}
 
-        ⚙️ सेटिङ:
-        /language - भाषा परिवर्तन
-        /setgoals - क्यालोरी लक्ष्य
-        /stats - प्रोफाइल
+      #{t('help_profile_title', lang)}
+      #{t('help_cmd_profile', lang)}
+      #{t('help_cmd_setgoal', lang)}
+      #{t('help_cmd_setactivity', lang)}
+      #{t('help_cmd_setbio', lang)}
+      #{t('help_cmd_suggest', lang)}
 
-        💡 सुझाव: क्याप्शन थप्नुहोस्!
-      TEXT
-    else
-      <<~TEXT
-        📖 How to Use KhanaAI
+      #{t('help_fasting_title', lang)}
+      #{t('help_cmd_setfasting', lang)}
+      #{t('help_cmd_reminders', lang)}
 
-        📸 Track Meals:
-        • Send food photo + optional caption
-        • Example: "2 momo plates, steamed"
+      #{t('help_prefs_title', lang)}
+      #{t('help_cmd_preferences', lang)}
+      #{t('help_cmd_vegetarian', lang)}
+      #{t('help_cmd_vegan', lang)}
+      #{t('help_cmd_allergic', lang)}
+      #{t('help_cmd_portions', lang)}
 
-        📊 View & Manage:
-        /today - Today's summary
-        /week - Weekly overview
-        /history - Last 10 meals
-        /last - View last meal
-        /undo - Remove last meal
+      #{t('help_settings_title', lang)}
+      #{t('help_cmd_language', lang)}
+      #{t('help_cmd_setgoals', lang)}
+      #{t('help_cmd_stats', lang)}
+      #{t('help_cmd_redeem', lang)}
 
-        🎯 Preferences:
-        /preferences - View all
-        /vegetarian - Toggle vegetarian
-        /vegan - Toggle vegan
-        /allergic <food> - Add allergy
-        /dislike <food> - Add dislike
-        /portions larger/smaller/normal
+      #{t('help_footer', lang)}
+    TEXT
 
-        ⚙️ Settings:
-        /language - Toggle En/Ne
-        /setgoals - Set calorie goal
-        /stats - Your profile
-        /redeem <code> - Promo code
-
-        💡 Works best with Nepali food!
-      TEXT
-    end
-
-    send_message(message.dig(:chat, :id), help_text)
+    send_message(message.dig(:chat, :id), help_text, parse_mode: "Markdown")
   end
 
   def handle_about_command(message)
+    user = User.find_by(telegram_id: message.dig(:from, :id))
+    lang = user&.language || 'en'
+
     about_text = <<~TEXT
-      🤖 KhanaAI v1.0
-      
-      AI-powered nutrition assistant for tracking Nepali meals!
-      
-      📊 Estimates: Calories, Protein, Carbs, Fat
-      🍛 Knows: Dal bhat, momo, tarkari, achar & more
-      
-      ⚠️ These are estimates only, not medical advice.
-      
-      Built with ❤️ in Nepal by Sushil Subedi
+      #{t('about_title', lang)}
+
+      #{t('about_desc', lang)}
+
+      #{t('about_features', lang)}
+
+      #{t('about_disclaimer', lang)}
+
+      #{t('about_creator', lang)}
     TEXT
 
-    send_message(message.dig(:chat, :id), about_text)
+    send_message(message.dig(:chat, :id), about_text, parse_mode: "Markdown")
   end
 
   def handle_today_command(message)
@@ -422,6 +480,16 @@ class TelegramController < ApplicationController
     end
 
     lang = user.language || 'en'
+
+    # Check for command router conversations (bio setup, fasting setup, etc.)
+    router = Telegram::CommandRouter.new(user)
+    if router.has_pending_conversation?
+      response = router.route_text_response(message[:text])
+      if response
+        send_response(chat_id, response)
+        return
+      end
+    end
 
     if user.has_pending_context?
       handle_followup_text(user, message[:text], chat_id)
@@ -824,8 +892,8 @@ class TelegramController < ApplicationController
     end
   end
 
-  def send_message(chat_id, text, reply_markup = nil)
-    TelegramService.new.send_message(chat_id: chat_id, text: text, reply_markup: reply_markup)
+  def send_message(chat_id, text, reply_markup: nil, parse_mode: nil)
+    TelegramService.new.send_message(chat_id: chat_id, text: text, reply_markup: reply_markup, parse_mode: parse_mode)
   end
 
   def find_or_create_user(from_data)

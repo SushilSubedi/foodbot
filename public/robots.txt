@@ -1,1 +1,11 @@
-# See https://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file
+# robots.txt for KhanaAI
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://khanaai.com/sitemap.xml
+
+# Disallow API endpoints
+Disallow: /telegram/
+Disallow: /whatsapp/
+Disallow: /up
