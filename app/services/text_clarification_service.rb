@@ -1,9 +1,10 @@
 class TextClarificationService
-  def initialize(text:, image_url:, possible_foods:, calorie_range:)
+  def initialize(text:, image_url:, possible_foods:, calorie_range:, user: nil)
     @text = text
     @image_url = image_url
     @possible_foods = possible_foods
     @calorie_range = calorie_range
+    @user = user
   end
 
   def call
@@ -16,8 +17,23 @@ class TextClarificationService
 
       The user has now clarified with: "#{@text}"
 
+      #{build_user_context}
+
       Based on this clarification, provide a complete nutrition analysis.
       Return STRICT JSON only, no markdown or extra text.
+      
+      IMPORTANT: BEVERAGES (drinks) are valid food items to analyze!
+      - If user mentions beverages (tea, coffee, water, beer, juice, soft drinks, etc.), analyze them
+      - Beverages should have status = "success", NOT "not_food"
+      - Use meal_type = "snack" for beverages unless clearly part of a meal
+      
+      IMPORTANT BEVERAGE CONTEXT:
+      - If user mentions alcohol (beer, raksi, tongba, chhyang, whiskey, wine, etc.): health_rating must be 2-4 (very unhealthy)
+      - Soft drinks/soda: health_rating 3-4 (unhealthy, high sugar)
+      - Water: 0 calories, health_rating 10 (most healthy)
+      - Chiya with sugar: ~80-120 kcal, without sugar: ~40-60 kcal
+      - For alcohol, advise limiting/avoiding consumption in your advice
+      - Suggest healthy drink alternatives: water, buttermilk, coconut water
 
       Return this exact structure:
       {
@@ -42,10 +58,22 @@ class TextClarificationService
           "fat_g": <number>
         },
         "balance": "balanced | carb-heavy | protein-low | fat-heavy",
+        "health_rating": <number between 1.0 and 10.0>,
         "advice": "<one short helpful sentence>",
         "confidence": <number between 0.0 and 1.0>,
         "assumptions": ["<assumption>"]
       }
+
+      HEALTH RATING GUIDELINES:
+      - 1-3: Unhealthy (alcohol, high sugar drinks, deep fried, processed)
+      - 4-6: Average (moderate balance, some processed elements)
+      - 7-8: Healthy (good balance, whole foods)
+      - 9-10: Excellent (optimal nutrition, superfoods)
+      
+      SPECIFIC RULES:
+      - Alcoholic beverages: 2-4 rating (very unhealthy)
+      - Soft drinks/soda: 3-4 rating (unhealthy)
+      - Water/herbal tea: 9-10 rating (very healthy)
     SYSTEM
 
     begin
@@ -74,5 +102,23 @@ class TextClarificationService
       Rails.logger.error("TextClarificationService failed: #{e.message}")
       nil
     end
+  end
+
+  private
+
+  def build_user_context
+    return "" unless @user && @user.has_preferences?
+
+    context = @user.ai_context_summary
+    return "" unless context.present?
+
+    <<~CONTEXT
+
+      USER PREFERENCES:
+      #{context}
+      
+      Consider these preferences in your analysis.
+      
+    CONTEXT
   end
 end

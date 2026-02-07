@@ -22,7 +22,8 @@ module Ai
         required(:carbs_g).filled(:float, gteq?: 0)
         required(:fat_g).filled(:float, gteq?: 0)
       end
-      optional(:balance).filled(:string, included_in?: %w[balanced carb-heavy protein-low fat-heavy])
+      optional(:balance).filled(:string, included_in?: %w[balanced carb-heavy protein-low fat-heavy unbalanced])
+      optional(:health_rating).filled(:float, gteq?: 1, lteq?: 10)
       optional(:advice).filled(:string)
       optional(:confidence).filled(:float, gteq?: 0, lteq?: 1)
       optional(:assumptions).array(:string)
