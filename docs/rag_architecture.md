@@ -45,12 +45,12 @@ FoodBot uses RAG to enhance LLM responses with relevant context from the user's 
 │                              FoodBot RAG System                              │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐                  │
-│  │ FoodCatalog  │    │ UserFoodStat │    │    User      │                  │
-│  │   (49 foods) │    │  (history)   │    │  (profile)   │                  │
-│  └──────┬───────┘    └──────┬───────┘    └──────┬───────┘                  │
-│         │                   │                   │                          │
-│         └───────────────────┼───────────────────┘                          │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐      │
+│  │ FoodCatalog  │ │ UserFoodStat │ │    User      │ │  UserMemory  │      │
+│  │   (49 foods) │ │  (history)   │ │  (profile)   │ │ (messages)   │      │
+│  └──────┬───────┘ └──────┬───────┘ └──────┬───────┘ └──────┬───────┘      │
+│         │                │                │                │              │
+│         └────────────────┼────────────────┼────────────────┘              │
 │                             ▼                                              │
 │                   ┌─────────────────┐                                      │
 │                   │   Embeddable    │  after_commit hook                   │
@@ -88,7 +88,8 @@ FoodBot uses RAG to enhance LLM responses with relevant context from the user's 
 │  │  HNSW Indexes (partial, by kind):                                    │  │
 │  │  ├── idx_embeddings_food_catalog_hnsw    (WHERE kind='food_catalog') │  │
 │  │  ├── idx_embeddings_user_food_stat_hnsw  (WHERE kind='user_food_stat')│ │
-│  │  └── idx_embeddings_user_profile_hnsw    (WHERE kind='user_profile') │  │
+│  │  ├── idx_embeddings_user_profile_hnsw    (WHERE kind='user_profile') │  │
+│  │  └── idx_embeddings_user_memory_hnsw     (WHERE kind='user_memory')  │  │
 │  └──────────────────────────────────────────────────────────────────────┘  │
 │                           │                                                │
 │                           ▼                                                │
@@ -104,6 +105,7 @@ FoodBot uses RAG to enhance LLM responses with relevant context from the user's 
 │         │       RagContextBuilder             │                            │
 │         │  • User constraints                 │                            │
 │         │  • Eating patterns                  │                            │
+│         │  • User memories (semantic recall)  │                            │
 │         │  • Semantic matches                 │                            │
 │         │  • Query intent                     │                            │
 │         └────────────────┬────────────────────┘                            │
@@ -167,7 +169,7 @@ add_index :embeddings, :content_sha
 ```ruby
 # app/models/embedding.rb
 class Embedding < ApplicationRecord
-  SUPPORTED_KINDS = %w[food_catalog user_food_stat user_profile].freeze
+  SUPPORTED_KINDS = %w[food_catalog user_food_stat user_profile user_memory].freeze
   DEFAULT_MODEL = "text-embedding-3-small".freeze
   DEFAULT_DIMENSIONS = 1536
 
@@ -939,6 +941,71 @@ OpenAI `text-embedding-3-small` pricing (as of 2024):
 
 ---
 
+## Preference Learning (Semantic Profile Updates)
+
+FoodBot automatically learns user preferences from natural language messages — no slash commands required.
+
+### How It Works
+
+```
+User sends: "म मासु खाँदिन, मलाई बदाम एलर्जी छ"
+        │
+        ▼
+TelegramController → enqueue PreferenceLearningJob (async)
+        │                    + respond via AiChatService (immediate)
+        ▼
+PreferenceLearningJob:
+  1. PreferenceExtractionService (LLM call → structured signals)
+     → {signals: [{field: "vegetarian", value: true, confidence: 0.92},
+                  {field: "allergies", op: "add", value: "peanut", confidence: 0.88}]}
+  2. PreferenceApplierService (safe, idempotent updates to User)
+     → Sets vegetarian=true, adds "peanut" to allergies
+  3. UserMemory.create! (stores raw message + extraction + changes)
+     → Embeddable auto-triggers UpsertEmbeddingJob for user_memory embedding
+  4. TelegramService → sends confirmation:
+     "🧠 बुझें — शाकाहारी सिफारिसहरू दिनेछु।
+      बुझें — *peanut* बाट टाढा राख्नेछु (एलर्जी)।"
+```
+
+### Supported Auto-Detected Fields
+
+| Field | Example Message | Extraction |
+|-------|----------------|------------|
+| Vegetarian/Vegan | "I don't eat meat" | `vegetarian=true` |
+| Allergies | "I'm allergic to peanuts" | `allergies += "peanuts"` |
+| Dislikes | "I hate onions" | `dislikes += "onions"` |
+| Health goal | "I want to lose weight" | `health_goal=weight_loss` |
+| Activity level | "I'm very active, I run daily" | `activity_level=very_active` |
+| Portions | "I eat big portions" | `portion_modifier=1.3` |
+| Language | Message in Devanagari script | `language=ne` |
+| Age | "I'm 25 years old" | `age=25` |
+| Weight | "I weigh 70 kg" | `weight_kg=70` |
+| Height | "I'm 5 feet 8 inches" | `height_cm=173` |
+| Gender | "I'm male" | `gender=male` |
+| Calorie goal | "My daily target is 1800 kcal" | `daily_calorie_goal=1800` |
+| Fasting | "I do 16:8 intermittent fasting" | `fasting_schedule=16_8` |
+
+### User Memory Embeddings
+
+User messages are stored as `UserMemory` records with `user_memory` embeddings. These are retrieved during RAG context building to provide the LLM with conversational memory:
+
+```ruby
+# RagContextBuilder includes a "User Memories" section
+## User Memories (Self-reported preferences & context)
+- [2026-02-10] "I don't eat meat, I'm allergic to peanuts"
+- [2026-02-09] "I want to lose weight, please suggest light foods"
+```
+
+### Safety Guardrails
+
+- **Confidence threshold**: Only signals with ≥ 0.7 confidence are applied
+- **Transient vs permanent**: "I'm skipping rice today" is NOT extracted; "I don't eat rice" IS
+- **Idempotent**: Same message won't be processed twice (dedupe by `source_message_id`)
+- **TDEE auto-update**: When biometrics change, TDEE is recalculated automatically
+- **Existing commands still work**: `/vegetarian`, `/allergic`, etc. remain functional
+
+---
+
 ## Summary
 
 The FoodBot RAG system provides:
@@ -948,5 +1015,7 @@ The FoodBot RAG system provides:
 3. **Performance**: HNSW indexes enable sub-millisecond similarity search
 4. **Automatic Sync**: Embeddable concern keeps embeddings up-to-date
 5. **Rich Context**: RagContextBuilder provides comprehensive LLM context
+6. **Preference Learning**: Auto-detects user preferences from natural language — no commands needed
+7. **Conversational Memory**: Stores and retrieves user messages for context-aware responses
 
 This architecture scales to millions of embeddings while maintaining fast search performance and personalized results.

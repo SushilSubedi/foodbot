@@ -4,7 +4,7 @@
 
 - Ruby 3.3.5 (check with `ruby -v`)
 - Rails 8.1.2
-- SQLite3
+- PostgreSQL (with pgvector extension)
 - OpenAI API key
 - Telegram Bot Token
 - ngrok (for local development)
@@ -35,11 +35,16 @@ TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 
 ### Setup Database
 ```bash
-# Run migrations
-rails db:migrate
+# Create and migrate
+rails db:create db:migrate
+```
 
-# Verify schema
-rails db:schema:load
+If you don't have pgvector installed yet, install it for your PostgreSQL version before running migrations.
+
+### Backfill User Food Stats (Optional)
+If you have existing meals and want better personalization:
+```bash
+bin/rails user_food_stats:backfill
 ```
 
 ## 2. Start the Rails Server

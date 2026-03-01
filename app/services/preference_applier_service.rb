@@ -1,6 +1,8 @@
 class PreferenceApplierService
   VALID_HEALTH_GOALS = %w[maintain weight_loss muscle_gain diabetic_friendly].freeze
   VALID_ACTIVITY_LEVELS = %w[sedentary light moderate very_active extremely_active].freeze
+  VALID_GENDERS = %w[male female other].freeze
+  VALID_FASTING_SCHEDULES = %w[16_8 14_10 18_6 20_4 custom].freeze
 
   def initialize(user:, signals:)
     @user = user
@@ -41,6 +43,20 @@ class PreferenceApplierService
       apply_portion_modifier(value, evidence)
     when "activity_level"
       apply_activity_level(value, evidence)
+    when "language"
+      apply_language(value, evidence)
+    when "age"
+      apply_age(value, evidence)
+    when "weight_kg"
+      apply_weight(value, evidence)
+    when "height_cm"
+      apply_height(value, evidence)
+    when "gender"
+      apply_gender(value, evidence)
+    when "daily_calorie_goal"
+      apply_calorie_goal(value, evidence)
+    when "intermittent_fasting"
+      apply_fasting(value, evidence)
     end
   end
 
@@ -110,6 +126,121 @@ class PreferenceApplierService
     old_value = @user.activity_level
     @user.update!(activity_level: normalized)
     { field: "activity_level", old_value: old_value, new_value: normalized, evidence: evidence }
+  end
+
+  def apply_language(value, evidence)
+    normalized = value.to_s.strip.downcase
+    return nil unless %w[en ne].include?(normalized)
+    return nil if @user.language == normalized
+
+    old_value = @user.language
+    @user.update!(language: normalized)
+    { field: "language", old_value: old_value, new_value: normalized, evidence: evidence }
+  end
+
+  def apply_age(value, evidence)
+    age = value.to_i
+    return nil unless age > 0 && age < 150
+    return nil if @user.age == age
+
+    old_value = @user.age
+    @user.update!(age: age)
+    { field: "age", old_value: old_value, new_value: age, evidence: evidence }
+  end
+
+  def apply_weight(value, evidence)
+    weight = value.to_f.round(2)
+    return nil unless weight > 20 && weight < 500
+    return nil if @user.weight_kg == weight
+
+    old_value = @user.weight_kg
+    @user.update!(weight_kg: weight)
+    @user.update_tdee! if @user.biometrics_complete?
+    { field: "weight_kg", old_value: old_value, new_value: weight, evidence: evidence }
+  end
+
+  def apply_height(value, evidence)
+    height = value.to_f.round(1)
+    return nil unless height > 50 && height < 300
+    return nil if @user.height_cm == height
+
+    old_value = @user.height_cm
+    @user.update!(height_cm: height)
+    @user.update_tdee! if @user.biometrics_complete?
+    { field: "height_cm", old_value: old_value, new_value: height, evidence: evidence }
+  end
+
+  def apply_gender(value, evidence)
+    normalized = value.to_s.strip.downcase
+    return nil unless VALID_GENDERS.include?(normalized)
+    return nil if @user.gender == normalized
+
+    old_value = @user.gender
+    @user.update!(gender: normalized)
+    @user.update_tdee! if @user.biometrics_complete?
+    { field: "gender", old_value: old_value, new_value: normalized, evidence: evidence }
+  end
+
+  def apply_calorie_goal(value, evidence)
+    calories = value.to_i
+    return nil unless calories >= 800 && calories <= 5000
+    return nil if @user.daily_calorie_goal == calories
+
+    old_value = @user.daily_calorie_goal
+    @user.update!(daily_calorie_goal: calories, calorie_goal_mode: "manual")
+    { field: "daily_calorie_goal", old_value: old_value, new_value: calories, evidence: evidence }
+  end
+
+  def apply_fasting(value, evidence)
+    return nil unless value.is_a?(Hash) || value.is_a?(ActionController::Parameters)
+
+    enabled = value["enabled"]
+
+    if enabled == false
+      return nil unless @user.intermittent_fasting_enabled?
+      @user.update!(
+        intermittent_fasting_enabled: false,
+        eating_window_start_local: nil,
+        eating_window_end_local: nil,
+        fasting_schedule: nil
+      )
+      return { field: "intermittent_fasting", old_value: "enabled", new_value: "disabled", evidence: evidence }
+    end
+
+    schedule = value["schedule"].to_s
+    return nil unless VALID_FASTING_SCHEDULES.include?(schedule)
+
+    if schedule == "custom"
+      start_time = parse_time(value["start"])
+      end_time = parse_time(value["end"])
+      return nil unless start_time && end_time
+
+      @user.update!(
+        intermittent_fasting_enabled: true,
+        fasting_schedule: "custom",
+        eating_window_start_local: start_time,
+        eating_window_end_local: end_time
+      )
+    else
+      preset = User::FASTING_SCHEDULES[schedule]
+      return nil unless preset
+
+      @user.update!(
+        intermittent_fasting_enabled: true,
+        fasting_schedule: schedule,
+        eating_window_start_local: Time.zone.parse(preset[:start]),
+        eating_window_end_local: Time.zone.parse(preset[:end])
+      )
+    end
+
+    { field: "intermittent_fasting", old_value: @user.intermittent_fasting_enabled_before_last_save ? "enabled" : "disabled", new_value: "enabled (#{schedule})", evidence: evidence }
+  end
+
+  def parse_time(time_str)
+    return nil unless time_str.present?
+    Time.zone.parse(time_str.to_s.strip)
+  rescue ArgumentError
+    nil
   end
 
   def to_boolean(value)

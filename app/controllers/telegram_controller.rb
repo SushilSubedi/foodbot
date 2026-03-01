@@ -466,7 +466,17 @@ class TelegramController < ApplicationController
     
     # Update user activity
     user&.update_last_seen!
-    
+
+    if caption.present? && user
+      PreferenceLearningJob.perform_later(
+        user_id: user.id,
+        message_text: caption,
+        chat_id: chat_id,
+        source_message_id: message[:message_id]&.to_s,
+        language: user.language
+      )
+    end
+
     process_image(chat_id, file_id, caption, message_id)
   end
 
@@ -713,6 +723,7 @@ class TelegramController < ApplicationController
     
     # Trigger daily stats calculation
     CalculateDailyStatsJob.perform_later(user.id, Date.today)
+    UpdateUserFoodStatsJob.perform_later(meal.id)
     
     meal
   end

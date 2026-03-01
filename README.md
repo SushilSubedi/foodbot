@@ -16,7 +16,7 @@ A Ruby on Rails Telegram bot that analyzes food photos and estimates calories an
 - OpenAI GPT-4o-mini (vision)
 - Telegram Bot API
 - Dry-validation for response contracts
-- SQLite database
+- PostgreSQL + pgvector (vector search)
 
 ## Setup
 

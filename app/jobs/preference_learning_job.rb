@@ -89,7 +89,21 @@ class PreferenceLearningJob < ApplicationJob
       pct = (new_value.to_f * 100).round
       "Noted — portions adjusted to *#{pct}%* of standard."
     when "activity_level"
-      "Got it — activity level set to *#{new_value.humanize}*."
+      "Got it — activity level set to *#{new_value.to_s.humanize}*."
+    when "language"
+      new_value == "ne" ? "भाषा नेपालीमा सेट गरियो।" : "Language set to English."
+    when "age"
+      "Got it — age set to *#{new_value}*."
+    when "weight_kg"
+      "Got it — weight set to *#{new_value} kg*."
+    when "height_cm"
+      "Got it — height set to *#{new_value} cm*."
+    when "gender"
+      "Got it — gender set to *#{new_value}*."
+    when "daily_calorie_goal"
+      "Got it — daily calorie target set to *#{new_value} kcal*."
+    when "intermittent_fasting"
+      new_value.to_s.include?("disabled") ? "Got it — intermittent fasting disabled." : "Got it — intermittent fasting *#{new_value}*."
     end
   end
 
@@ -116,6 +130,21 @@ class PreferenceLearningJob < ApplicationJob
       "बुझें — भाग आकार *#{pct}%* मा समायोजन गरियो।"
     when "activity_level"
       "बुझें — गतिविधि स्तर *#{new_value}* मा सेट गरियो।"
+    when "language"
+      new_value == "ne" ? "भाषा नेपालीमा सेट गरियो।" : "Language set to English."
+    when "age"
+      "बुझें — उमेर *#{new_value}* सेट गरियो।"
+    when "weight_kg"
+      "बुझें — तौल *#{new_value} kg* सेट गरियो।"
+    when "height_cm"
+      "बुझें — उचाइ *#{new_value} cm* सेट गरियो।"
+    when "gender"
+      labels = { "male" => "पुरुष", "female" => "महिला", "other" => "अन्य" }
+      "बुझें — लिङ्ग *#{labels[new_value] || new_value}* सेट गरियो।"
+    when "daily_calorie_goal"
+      "बुझें — दैनिक क्यालोरी लक्ष्य *#{new_value} kcal* सेट गरियो।"
+    when "intermittent_fasting"
+      new_value.to_s.include?("disabled") ? "बुझें — बर्ती उपवास बन्द गरियो।" : "बुझें — बर्ती उपवास *#{new_value}* सेट गरियो।"
     end
   end
 end
