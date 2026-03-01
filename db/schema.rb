@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_08_051046) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_10_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -31,6 +31,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_08_051046) do
     t.index ["content_sha"], name: "index_embeddings_on_content_sha"
     t.index ["embedding"], name: "idx_embeddings_food_catalog_hnsw", opclass: :vector_cosine_ops, where: "((kind)::text = 'food_catalog'::text)", using: :hnsw
     t.index ["embedding"], name: "idx_embeddings_user_food_stat_hnsw", opclass: :vector_cosine_ops, where: "((kind)::text = 'user_food_stat'::text)", using: :hnsw
+    t.index ["embedding"], name: "idx_embeddings_user_memory_hnsw", opclass: :vector_cosine_ops, where: "((kind)::text = 'user_memory'::text)", using: :hnsw
     t.index ["embedding"], name: "idx_embeddings_user_profile_hnsw", opclass: :vector_cosine_ops, where: "((kind)::text = 'user_profile'::text)", using: :hnsw
     t.index ["kind"], name: "index_embeddings_on_kind"
     t.index ["record_type", "record_id", "kind"], name: "idx_embeddings_on_record_and_kind", unique: true
@@ -175,6 +176,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_08_051046) do
     t.index ["user_id"], name: "index_user_food_stats_on_user_id"
   end
 
+  create_table "user_memories", force: :cascade do |t|
+    t.jsonb "applied_changes", default: {}
+    t.decimal "confidence", precision: 3, scale: 2
+    t.datetime "created_at", null: false
+    t.jsonb "extraction", default: {}
+    t.string "language"
+    t.string "source", default: "telegram"
+    t.string "source_message_id"
+    t.text "text", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["created_at"], name: "index_user_memories_on_created_at"
+    t.index ["user_id", "source_message_id"], name: "idx_user_memories_on_user_id_and_source_message_id", unique: true, where: "(source_message_id IS NOT NULL)"
+    t.index ["user_id"], name: "index_user_memories_on_user_id"
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "activity_level", default: "sedentary", null: false
     t.integer "age"
@@ -224,4 +241,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_08_051046) do
   add_foreign_key "promo_code_redemptions", "users"
   add_foreign_key "user_daily_stats", "users"
   add_foreign_key "user_food_stats", "users"
+  add_foreign_key "user_memories", "users"
 end

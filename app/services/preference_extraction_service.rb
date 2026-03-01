@@ -16,6 +16,13 @@ class PreferenceExtractionService
               health_goal
               portion_modifier
               activity_level
+              language
+              age
+              weight_kg
+              height_cm
+              gender
+              daily_calorie_goal
+              intermittent_fasting
             ] },
             value: {},
             confidence: { type: "number" },
@@ -94,9 +101,32 @@ class PreferenceExtractionService
       - Be conservative: if unsure, don't extract
       - Set confidence between 0.0 and 1.0
 
+      BIOMETRICS:
+      - "I'm 25 years old" or "मेरो उमेर २५ वर्ष हो" - extract as age=25
+      - "I weigh 70 kg" or "मेरो तौल ७० केजी" - extract as weight_kg=70
+      - "I'm 175 cm tall" or "5 feet 8 inches" - extract as height_cm (convert feet/inches to cm)
+      - "I'm male/female" or "म पुरुष/महिला हुँ" - extract as gender=male/female/other
+
+      LANGUAGE:
+      - If the ENTIRE message is written in Nepali (Devanagari script), extract language="ne"
+      - If the ENTIRE message is written in English, extract language="en"
+      - Only extract if user's current language doesn't match the message language
+
+      CALORIE GOAL:
+      - "I want to eat 1800 calories a day" - extract as daily_calorie_goal=1800
+      - "My daily target is 2000 kcal" - extract as daily_calorie_goal=2000
+      - Valid range: 800-5000
+
+      INTERMITTENT FASTING:
+      - "I do 16:8 fasting" - extract as intermittent_fasting with value {"enabled": true, "schedule": "16_8"}
+      - "I do intermittent fasting, eating from 12 to 8" - extract as intermittent_fasting with value {"enabled": true, "schedule": "custom", "start": "12:00", "end": "20:00"}
+      - "I stopped fasting" - extract as intermittent_fasting with value {"enabled": false}
+      - Valid schedules: 16_8, 14_10, 18_6, 20_4, custom
+
       Valid health_goal values: maintain, weight_loss, muscle_gain, diabetic_friendly
       Valid activity_level values: sedentary, light, moderate, very_active, extremely_active
       Valid portion_modifier range: 0.5 to 2.0
+      Valid gender values: male, female, other
 
       If no preference signals are found, return {"signals": []}.
 
@@ -105,7 +135,7 @@ class PreferenceExtractionService
         "signals": [
           {
             "op": "set|add|remove",
-            "field": "dietary_preferences.vegetarian|dietary_preferences.vegan|dietary_preferences.allergies|dietary_preferences.dislikes|health_goal|portion_modifier|activity_level",
+            "field": "one of the valid field names listed above",
             "value": "<value>",
             "confidence": 0.0-1.0,
             "evidence": "relevant quote from message"
@@ -124,6 +154,13 @@ class PreferenceExtractionService
     parts << "Health goal: #{@user.health_goal}"
     parts << "Activity level: #{@user.activity_level}"
     parts << "Portion modifier: #{@user.portion_modifier}"
+    parts << "Language: #{@user.language || 'en'}"
+    parts << "Age: #{@user.age || 'Not set'}"
+    parts << "Weight: #{@user.weight_kg ? "#{@user.weight_kg}kg" : 'Not set'}"
+    parts << "Height: #{@user.height_cm ? "#{@user.height_cm}cm" : 'Not set'}"
+    parts << "Gender: #{@user.gender || 'Not set'}"
+    parts << "Daily calorie goal: #{@user.daily_calorie_goal || 2000}"
+    parts << "Intermittent fasting: #{@user.intermittent_fasting_enabled? ? "enabled (#{@user.fasting_schedule})" : 'disabled'}"
     parts.join("\n")
   end
 end
