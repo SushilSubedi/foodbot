@@ -238,6 +238,8 @@ GEM
     msgpack (1.8.0)
     multi_json (1.19.1)
     multipart-post (2.4.1)
+    neighbor (0.6.0)
+      activerecord (>= 7.1)
     net-http (0.9.1)
       uri (>= 0.11.1)
     net-imap (0.6.2)
@@ -486,6 +488,7 @@ DEPENDENCIES
   gemini-ai (~> 4.3)
   image_processing (~> 1.2)
   kamal
+  neighbor (~> 0.6.0)
   noticed
   pg (~> 1.5)
   puma (>= 5.0)

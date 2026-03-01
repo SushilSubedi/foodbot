@@ -107,18 +107,56 @@ class TextClarificationService
   private
 
   def build_user_context
-    return "" unless @user && @user.has_preferences?
+    return "" unless @user
 
-    context = @user.ai_context_summary
-    return "" unless context.present?
+    rag_context = build_rag_context
+    return "" if rag_context.blank?
 
     <<~CONTEXT
 
-      USER PREFERENCES:
-      #{context}
+      USER CONTEXT (RAG-Enhanced):
+      #{rag_context}
       
-      Consider these preferences in your analysis.
+      IMPORTANT: 
+      - NEVER suggest foods the user is allergic to
+      - Respect dietary restrictions (vegetarian, vegan, etc.)
+      - Consider user's health goal when giving advice
+      - Reference similar foods from user's history if relevant
       
     CONTEXT
+  end
+
+  def build_rag_context
+    return @user.ai_context_summary unless semantic_search_enabled?
+
+    builder = RagContextBuilder.new(user: @user)
+    query = [@text, @possible_foods].flatten.compact.join(" ")
+
+    builder.build(
+      query: query,
+      semantic_results: fetch_semantic_results(query),
+      include_eating_patterns: true
+    )
+  rescue StandardError => e
+    Rails.logger.warn("[TextClarification] RAG context failed: #{e.message}")
+    @user.ai_context_summary
+  end
+
+  def fetch_semantic_results(query)
+    return [] unless semantic_search_enabled?
+
+    SemanticFoodSearch.new(user: @user).search(
+      query: query,
+      limit: 5,
+      include_catalog: true,
+      include_personal: true
+    )
+  rescue StandardError => e
+    Rails.logger.warn("[TextClarification] Semantic search failed: #{e.message}")
+    []
+  end
+
+  def semantic_search_enabled?
+    Embedding.exists? && @user.present?
   end
 end
