@@ -60,3 +60,5 @@ gem "dotenv-rails", "~> 3.2", groups: [:development, :test]
 gem "rspec-rails", "~> 8.0", groups: [:development, :test]
 
 gem "webmock", "~> 3.26", group: :test
+
+gem "neighbor", "~> 0.6.0"

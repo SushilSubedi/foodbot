@@ -1,11 +1,23 @@
 class User < ApplicationRecord
-  # Associations
+  include Embeddable
+
   has_many :meals, dependent: :destroy
   has_many :user_daily_stats, dependent: :destroy
   has_many :user_food_stats, dependent: :destroy
   has_many :nutrition_trends, dependent: :destroy
+  has_many :user_memories, dependent: :destroy
 
-  # Enums
+  def self.embedding_kind
+    "user_profile"
+  end
+
+  def self.embedding_trigger_attributes
+    %w[health_goal activity_level dietary_preferences ai_context
+       daily_calorie_goal portion_modifier intermittent_fasting_enabled
+       fasting_schedule language]
+  end
+
+  after_commit :refresh_profile_embedding_on_food_changes, on: :update
   enum :health_goal, {
     maintain: "maintain",
     weight_loss: "weight_loss",
@@ -390,8 +402,27 @@ class User < ApplicationRecord
     dietary_preferences&.dig("allergies") || []
   end
 
-  # Dislikes accessor
   def dislikes
     dietary_preferences&.dig("dislikes") || []
+  end
+
+  def search_foods(query, limit: 10)
+    SemanticFoodSearch.new(user: self).search(query: query, limit: limit)
+  end
+
+  def rag_context(query: nil)
+    RagContextBuilder.new(user: self).build_for_recommendation(query: query)
+  end
+
+  private
+
+  def refresh_profile_embedding_on_food_changes
+    return unless meals_updated_recently?
+
+    RefreshUserProfileEmbeddingJob.perform_later(user_id: id)
+  end
+
+  def meals_updated_recently?
+    meals.where("created_at > ?", 1.hour.ago).exists?
   end
 end

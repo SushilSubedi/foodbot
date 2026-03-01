@@ -188,7 +188,37 @@ class FoodRecommendationService
   end
 
   def find_healthier_alternatives(normalized_name)
-    NEPALI_ALTERNATIVES[normalized_name] || default_alternatives
+    static_alternatives = NEPALI_ALTERNATIVES[normalized_name]
+    return static_alternatives if static_alternatives.present?
+
+    semantic_alternatives = find_semantic_alternatives(normalized_name)
+    return semantic_alternatives if semantic_alternatives.any?
+
+    default_alternatives
+  end
+
+  def find_semantic_alternatives(food_name)
+    return [] unless semantic_search_enabled?
+
+    search = SemanticFoodSearch.new(user: @user)
+    results = search.similar_foods(food_name: food_name, limit: 3)
+
+    results.filter_map do |result|
+      next if result.record.is_a?(UserFoodStat) && result.record.health_score && result.record.health_score < 60
+
+      if result.record.is_a?(FoodCatalog)
+        result.record.name
+      elsif result.record.is_a?(UserFoodStat) && result.record.health_score && result.record.health_score >= 70
+        result.record.display_name
+      end
+    end
+  rescue StandardError => e
+    Rails.logger.warn("[FoodRecommendation] Semantic search failed: #{e.message}")
+    []
+  end
+
+  def semantic_search_enabled?
+    Embedding.exists? && @user.present?
   end
 
   def default_alternatives

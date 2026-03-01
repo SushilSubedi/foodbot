@@ -10,20 +10,49 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_05_000009) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_08_051046) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+  enable_extension "vector"
+
+  create_table "embeddings", force: :cascade do |t|
+    t.text "content", null: false
+    t.string "content_sha", null: false
+    t.datetime "created_at", null: false
+    t.integer "dimensions", null: false
+    t.datetime "embedded_at"
+    t.vector "embedding", limit: 1536, null: false
+    t.string "kind", null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.string "model", null: false
+    t.bigint "record_id", null: false
+    t.string "record_type", null: false
+    t.datetime "updated_at", null: false
+    t.index ["content_sha"], name: "index_embeddings_on_content_sha"
+    t.index ["embedding"], name: "idx_embeddings_food_catalog_hnsw", opclass: :vector_cosine_ops, where: "((kind)::text = 'food_catalog'::text)", using: :hnsw
+    t.index ["embedding"], name: "idx_embeddings_user_food_stat_hnsw", opclass: :vector_cosine_ops, where: "((kind)::text = 'user_food_stat'::text)", using: :hnsw
+    t.index ["embedding"], name: "idx_embeddings_user_profile_hnsw", opclass: :vector_cosine_ops, where: "((kind)::text = 'user_profile'::text)", using: :hnsw
+    t.index ["kind"], name: "index_embeddings_on_kind"
+    t.index ["record_type", "record_id", "kind"], name: "idx_embeddings_on_record_and_kind", unique: true
+  end
 
   create_table "food_catalogs", force: :cascade do |t|
+    t.jsonb "aliases", default: [], null: false
     t.integer "calories_per_serving"
     t.float "carbs_g"
     t.datetime "created_at"
+    t.jsonb "cuisine_tags", default: [], null: false
     t.string "default_serving"
+    t.text "description"
     t.float "fat_g"
     t.boolean "is_nepali", default: false
     t.string "name"
+    t.string "name_nepali"
+    t.string "name_romanized"
     t.float "protein_g"
     t.index ["name"], name: "index_food_catalogs_on_name", unique: true
+    t.index ["name_nepali"], name: "index_food_catalogs_on_name_nepali"
+    t.index ["name_romanized"], name: "index_food_catalogs_on_name_romanized"
   end
 
   create_table "food_items", force: :cascade do |t|

@@ -1,4 +1,6 @@
 class UserFoodStat < ApplicationRecord
+  include Embeddable
+
   belongs_to :user
 
   validates :normalized_name, presence: true, uniqueness: { scope: :user_id }
@@ -10,6 +12,15 @@ class UserFoodStat < ApplicationRecord
   scope :recent, -> { where("last_eaten_at > ?", 30.days.ago) }
   scope :healthy, -> { where("health_score >= ?", 70) }
   scope :needs_improvement, -> { where("health_score < ?", 60) }
+
+  def self.embedding_kind
+    "user_food_stat"
+  end
+
+  def self.embedding_trigger_attributes
+    %w[normalized_name avg_calories avg_protein_g avg_carbs_g avg_fat_g
+       times_eaten health_score most_common_meal_type]
+  end
 
   def display_name
     normalized_name.to_s.titleize

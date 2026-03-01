@@ -494,23 +494,26 @@ class TelegramController < ApplicationController
     if user.has_pending_context?
       handle_followup_text(user, message[:text], chat_id)
     else
-      text = if lang == 'ne'
-        casual_responses = [
-          "📸 खानाको फोटो पठाउनुहोस् त!",
-          "📸 के खानुभयो? फोटो पठाउनुहोस्!",
-          "📸 फोटो पठाउनुहोस्, म हेर्छु क्यालोरी कति छ।"
-        ]
-        casual_responses.sample
+      PreferenceLearningJob.perform_later(
+        user_id: user.id,
+        message_text: message[:text],
+        chat_id: chat_id,
+        source_message_id: message[:message_id]&.to_s,
+        language: lang
+      )
+
+      response = AiChatService.new(user: user, message: message[:text]).call
+
+      if response.present?
+        send_message(chat_id, response)
       else
-        casual_responses = [
-          "📸 Show me what you're eating!",
-          "📸 Snap a pic of your food and I'll check the calories.",
-          "📸 Send me a food photo!",
-          "What are you having? 📸 Send a pic!"
-        ]
-        casual_responses.sample
+        text = if lang == 'ne'
+          "📸 खानाको फोटो पठाउनुहोस् त!"
+        else
+          "📸 Send me a food photo or ask me a nutrition question!"
+        end
+        send_message(chat_id, text)
       end
-      send_message(chat_id, text)
     end
   end
 
