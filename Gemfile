@@ -53,7 +53,7 @@ end
 gem "twilio-ruby", "~> 7.10"
 gem "gemini-ai", "~> 4.3"
 gem "ruby-openai", "~> 8.3"
-gem "dry-schema", "~> 1.13"
+gem "dry-schema", "~> 1.16"
 gem "dry-validation", "~> 1.10"
 
 gem "dotenv-rails", "~> 3.2", groups: [:development, :test]
